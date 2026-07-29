@@ -1,0 +1,97 @@
+# VKab
+
+VKab is a practical language-learning app built around the words and phrases people actually need in their own lives.
+
+Instead of choosing a fixed curriculum, the first version turns translation history into a personal vocabulary list: look something up, use it, and keep it for later. The longer-term goal is to turn that vocabulary into effective practice and complement it with community-built, boots-on-the-ground language packs.
+
+The project is in the planning stage. The complete MVP requirements are tracked in [PRD: Google Translate vocabulary lookup MVP](https://github.com/ihafkenschiel/vkab/issues/1).
+
+## MVP
+
+Version one intentionally does one workflow well:
+
+1. Start immediately with an anonymous session—no signup form.
+2. Choose a source language and a target language.
+3. Enter a word or short phrase.
+4. Translate it with Google Cloud Translation.
+5. Automatically save the original text, translated text, and language direction.
+6. Review saved vocabulary in newest-first order.
+7. Delete entries that are mistaken or no longer useful.
+
+Repeated lookups in the same language direction update the existing entry instead of creating duplicates. The app also records how often an entry is looked up, creating useful data for future practice features.
+
+The MVP will be mobile-friendly, accessible, and deployable on Vercel with Supabase. Vocabulary is private to the anonymous user through database Row Level Security. In this first version, access is tied to the browser session; clearing browser data or changing devices may make the list inaccessible.
+
+### Not in the MVP
+
+- Quizzes, scores, or spaced repetition
+- Flashcards
+- Curated language packs or lessons
+- Community publishing, voting, or moderation
+- Permanent accounts or cross-device sync
+- Audio, speech recognition, or pronunciation grading
+- Monetization
+
+Keeping these out of version one makes it possible to validate the central idea quickly: language learners benefit from remembering what they personally needed to translate.
+
+## Planned architecture
+
+- **Frontend:** React, Vite, and strict TypeScript
+- **Hosting:** Vercel
+- **Translation:** Google Cloud Translation Basic v2, called only from a server-side endpoint
+- **Authentication:** Supabase anonymous authentication
+- **Database:** Supabase PostgreSQL with Row Level Security
+- **Validation:** Zod at application boundaries
+
+The browser sends an authenticated request to a same-origin translation endpoint. That endpoint validates the text and language codes, calls Google, and returns the translation without exposing the API key. The browser then records the successful lookup in Supabase under the current user's ID.
+
+Translation and persistence remain separate outcomes: if saving fails, the translation stays visible and can be saved again without paying for another translation request.
+
+## Cost target
+
+The project is designed for the Vercel and Supabase free allowances. Google Cloud Translation currently provides a monthly credit covering the first 500,000 NMT translation characters, but usage beyond that allowance is billable. Production setup must include a deliberately reduced daily character quota so unexpected traffic stops safely instead of creating an unexpected bill.
+
+Pricing and platform limits can change. Check the current [Google Cloud Translation pricing](https://cloud.google.com/products/translate/pricing) and [quota documentation](https://docs.cloud.google.com/translate/quotas) before deployment.
+
+## Long-term objectives
+
+VKab should grow from a personal translation notebook into a practical learning system without losing its user-led foundation.
+
+### Learn from personal vocabulary
+
+- Generate multiple-choice quizzes from saved lookups.
+- Track answers and prioritize words the learner gets wrong.
+- Use repeated lookups and practice history to choose what to review.
+- Add flashcards and spaced-repetition scheduling.
+- Preserve context so phrases remain useful rather than becoming isolated trivia.
+
+### Start with practical language packs
+
+- Offer concise country- and city-relevant packs for arriving travelers.
+- Organize material around real situations such as lodging, restaurants, transport, shopping, nightlife, dating, and outdoor trips.
+- Include regional vocabulary and cultural context, such as Brazilian Portuguese and Argentinian Lunfardo, instead of treating every language as geographically uniform.
+- Let learners add useful pack entries to their own vocabulary and practice history.
+
+### Build a community library
+
+- Let people publish and maintain language packs based on lived experience.
+- Let the community vote on packs so the most useful material rises to the top.
+- Support attribution, versioning, reports, and moderation so shared material can improve without becoming unsafe or unreliable.
+- Make it easy to adapt a strong pack to a new place or language while preserving local nuance.
+
+### Make learning portable
+
+- Add permanent accounts and safe anonymous-account upgrades.
+- Synchronize vocabulary and progress across devices.
+- Add pronunciation audio, speech input, and richer translation context where they materially help learners communicate.
+- Support import and export so learners retain control of their vocabulary.
+
+The long-term measure of success is usefulness: helping someone say, understand, and remember what matters in the situations they are actually navigating.
+
+## Contributing
+
+Pull requests are welcome. Please open an issue before beginning a substantial change so the scope and product intent are clear.
+
+## License
+
+The repository is source-available, not open source. You may view the code and submit pull requests, but reuse, modification, redistribution, sublicensing, or use in another project requires written permission. See [LICENSE](./LICENSE) for the full terms.
