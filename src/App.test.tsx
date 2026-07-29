@@ -116,6 +116,36 @@ describe("anonymous learner session", () => {
     ).toBeEnabled();
   });
 
+  it("retries the external session boundary and becomes ready", async () => {
+    const getSession = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: { session: null },
+        error: new Error("network unavailable"),
+      })
+      .mockResolvedValueOnce({
+        data: { session: { user: { id: "learner-1" } } },
+        error: null,
+      });
+    const supabase = {
+      auth: {
+        getSession,
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+
+    render(<App supabase={supabase} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Try again" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Translate" }),
+    ).toBeVisible();
+    expect(getSession).toHaveBeenCalledTimes(2);
+  });
+
   it("switches between Translate and Vocabulary with focusable controls", async () => {
     const supabase = {
       auth: {

@@ -38,9 +38,16 @@ export function readPublicEnvironment(
   }
 
   const environment = parsedEnvironment.data;
+  const supabaseUrl = new URL(environment.VITE_SUPABASE_URL);
+
+  if (supabaseUrl.protocol !== "http:" && supabaseUrl.protocol !== "https:") {
+    throw new Error(
+      "VITE_SUPABASE_URL must use HTTP or HTTPS. Update .env.local and restart VKab.",
+    );
+  }
 
   return {
-    supabaseUrl: environment.VITE_SUPABASE_URL,
+    supabaseUrl: supabaseUrl.href.replace(/\/$/, ""),
     supabasePublishableKey: environment.VITE_SUPABASE_PUBLISHABLE_KEY,
   };
 }
