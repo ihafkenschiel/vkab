@@ -53,6 +53,46 @@ The project is designed for the Vercel and Supabase free allowances. Google Clou
 
 Pricing and platform limits can change. Check the current [Google Cloud Translation pricing](https://cloud.google.com/products/translate/pricing) and [quota documentation](https://docs.cloud.google.com/translate/quotas) before deployment.
 
+## Local development
+
+Requirements:
+
+- Node.js 20.19 or newer
+- pnpm 10 or newer
+- A Supabase project with anonymous sign-ins enabled
+
+Install dependencies and create a local environment file:
+
+```sh
+pnpm install
+cp .env.example .env.local
+```
+
+Replace the placeholders in `.env.local` with the project's Supabase URL and publishable key. These are the only Supabase values the browser needs:
+
+```text
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
+```
+
+Never place a secret key or service-role key in a `VITE_` variable. Vite exposes those variables to browser code.
+
+Start the application:
+
+```sh
+pnpm dev
+```
+
+The first visit creates an anonymous Supabase identity. Supabase stores that session in the browser and restores it on refresh. Clearing browser data or changing devices can make anonymous vocabulary inaccessible.
+
+Run the project checks:
+
+```sh
+pnpm test
+pnpm typecheck
+pnpm build
+```
+
 ## Long-term objectives
 
 VKab should grow from a personal translation notebook into a practical learning system without losing its user-led foundation. All of the objectives below are outside the MVP.

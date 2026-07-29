@@ -1,0 +1,241 @@
+:root {
+  color: #172033;
+  background: #f5f6f8;
+  font-family:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: #f5f6f8;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button {
+  font: inherit;
+}
+
+button:focus-visible {
+  outline: 3px solid #155eef;
+  outline-offset: 3px;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  width: min(100%, 54rem);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 0 1rem 6.5rem;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 4.5rem;
+  border-bottom: 1px solid #dfe3eb;
+}
+
+.wordmark,
+.eyebrow,
+.session-indicator {
+  margin: 0;
+}
+
+.wordmark {
+  color: #0f172a;
+  font-size: 1.125rem;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+}
+
+.session-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #59647a;
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.session-indicator::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #155eef;
+  content: "";
+}
+
+.view-navigation {
+  position: fixed;
+  z-index: 10;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.75rem max(1rem, env(safe-area-inset-right))
+    max(0.75rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  border-top: 1px solid #dfe3eb;
+  background: rgb(255 255 255 / 96%);
+}
+
+.view-navigation__control {
+  min-height: 3.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  color: #59647a;
+  background: transparent;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.view-navigation__control[aria-current="page"] {
+  border-color: #bcd0ff;
+  color: #0b45b5;
+  background: #eaf0ff;
+}
+
+.view-panel {
+  min-height: 18rem;
+  margin-top: 1rem;
+  padding: 1.5rem;
+  border: 1px solid #dfe3eb;
+  border-radius: 1rem;
+  background: #ffffff;
+  box-shadow: 0 0.5rem 1.5rem rgb(23 32 51 / 6%);
+}
+
+.view-heading {
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #e7eaf0;
+}
+
+.eyebrow {
+  color: #0b45b5;
+  font-size: 0.75rem;
+  font-weight: 780;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0.35rem 0 0;
+  color: #0f172a;
+  font-size: clamp(1.75rem, 7vw, 2.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+
+.privacy-note {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border-left: 4px solid #155eef;
+  border-radius: 0.25rem 0.75rem 0.75rem 0.25rem;
+  color: #3d4960;
+  background: #f3f6ff;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.privacy-note strong {
+  color: #172033;
+}
+
+.centered-state {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.state-card {
+  width: min(100%, 30rem);
+  padding: 1.5rem;
+  border: 1px solid #dfe3eb;
+  border-radius: 1rem;
+  background: #ffffff;
+  box-shadow: 0 0.5rem 1.5rem rgb(23 32 51 / 6%);
+}
+
+.state-card p:not(.eyebrow) {
+  margin: 1rem 0 0;
+  color: #59647a;
+  line-height: 1.55;
+}
+
+.primary-action {
+  width: 100%;
+  min-height: 3.5rem;
+  margin-top: 1.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #0b45b5;
+  border-radius: 0.75rem;
+  color: #ffffff;
+  background: #155eef;
+  font-weight: 740;
+  cursor: pointer;
+}
+
+.primary-action:hover {
+  background: #0b45b5;
+}
+
+@media (min-width: 45rem) {
+  .app-shell {
+    grid-template-columns: 13rem minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: 1.5rem;
+    padding: 0 1.5rem 2rem;
+  }
+
+  .app-header {
+    grid-column: 1 / -1;
+  }
+
+  .view-navigation {
+    position: static;
+    align-self: start;
+    grid-template-columns: 1fr;
+    margin-top: 1.5rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .view-navigation__control {
+    justify-self: stretch;
+    text-align: left;
+  }
+
+  .view-panel {
+    margin-top: 1.5rem;
+    padding: 2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
