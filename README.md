@@ -55,7 +55,7 @@ Pricing and platform limits can change. Check the current [Google Cloud Translat
 
 ## Long-term objectives
 
-VKab should grow from a personal translation notebook into a practical learning system without losing its user-led foundation.
+VKab should grow from a personal translation notebook into a practical learning system without losing its user-led foundation. All of the objectives below are outside the MVP.
 
 ### Learn from personal vocabulary
 
@@ -72,6 +72,17 @@ VKab should grow from a personal translation notebook into a practical learning 
 - Include regional vocabulary and cultural context, such as Brazilian Portuguese and Argentinian Lunfardo, instead of treating every language as geographically uniform.
 - Let learners add useful pack entries to their own vocabulary and practice history.
 
+### Learn while living or traveling there
+
+- Add listening practice and a way to record practical pronunciation for review.
+- Help learners hit the ground running with language they can hear, say, understand, and use while their boots are on the ground, rather than with classroom-style progression.
+- For a Latin-alphabet learner starting Japanese, begin with practical spoken language and Latin transliteration. Introduce Japanese characters later when they unlock an immediate task, such as reading menus, signs, station names, addresses, names, or messages.
+
+### Introduce writing systems when they are useful
+
+- Support learning writing systems such as Cyrillic and Japanese hiragana, katakana, and practical introductory kanji.
+- Adapt the sequence to the writing system and the learner's immediate needs. Cyrillic letter-sound recognition may be useful early, while Japanese should begin with heard and spoken survival language.
+
 ### Build a community library
 
 - Let people publish and maintain language packs based on lived experience.
@@ -83,7 +94,7 @@ VKab should grow from a personal translation notebook into a practical learning 
 
 - Add permanent accounts and safe anonymous-account upgrades.
 - Synchronize vocabulary and progress across devices.
-- Add pronunciation audio, speech input, and richer translation context where they materially help learners communicate.
+- Add richer translation context where it materially helps learners communicate.
 - Support import and export so learners retain control of their vocabulary.
 
 The long-term measure of success is usefulness: helping someone say, understand, and remember what matters in the situations they are actually navigating.
