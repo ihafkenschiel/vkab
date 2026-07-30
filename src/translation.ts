@@ -48,8 +48,8 @@ export function validateTranslationInput(input: {
   }
 
   if (
-    !(input.sourceLanguage in supportedLanguages) ||
-    !(input.targetLanguage in supportedLanguages)
+    !Object.hasOwn(supportedLanguages, input.sourceLanguage) ||
+    !Object.hasOwn(supportedLanguages, input.targetLanguage)
   ) {
     return {
       ok: false,

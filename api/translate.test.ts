@@ -138,4 +138,31 @@ describe("POST /api/translate", () => {
     });
     expect(translate).not.toHaveBeenCalled();
   });
+
+  it("rejects language names inherited from the catalog prototype", async () => {
+    const authenticate = vi.fn().mockResolvedValue(true);
+    const translate = vi.fn();
+    const handle = createTranslateHandler({ authenticate, translate });
+    const request = new Request("https://example.test/api/translate", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer learner-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: "Good morning",
+        sourceLanguage: "toString",
+        targetLanguage: "pl",
+      }),
+    });
+
+    const response = await handle(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "UNSUPPORTED_LANGUAGE",
+      message: "Choose a supported language.",
+    });
+    expect(translate).not.toHaveBeenCalled();
+  });
 });
