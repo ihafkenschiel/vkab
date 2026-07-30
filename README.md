@@ -8,7 +8,7 @@ The MVP is under active development. Its complete requirements are tracked in [P
 
 ## MVP
 
-Version one intentionally does one workflow well:
+The complete MVP target intentionally focuses on one workflow:
 
 1. Start immediately with an anonymous session—no signup form.
 2. Choose a source language and a target language.
@@ -16,11 +16,17 @@ Version one intentionally does one workflow well:
 4. Translate it with Google Cloud Translation.
 5. Automatically save the original text, translated text, and language direction.
 6. Review saved vocabulary in newest-first order.
-7. Delete entries that are mistaken or no longer useful.
+7. Delete entries that are mistaken or no longer useful. This remains an upcoming part of MVP issue [#7](https://github.com/ihafkenschiel/vkab/issues/7).
 
 Repeated lookups in the same language direction update the existing entry instead of creating duplicates. The app also records how often an entry is looked up, creating useful data for future practice features.
 
 The MVP will be mobile-friendly, accessible, and deployable on Vercel with Supabase. Vocabulary is private to the anonymous user through database Row Level Security. In this first version, access is tied to the browser session; clearing browser data or changing devices may make the list inaccessible.
+
+### Current review cutoff
+
+The current review branch lets a hands-on tester start an anonymous session, translate between English and Polish, automatically save successful translations, review private vocabulary newest first, and update repeated lookups without creating duplicates.
+
+If a vocabulary save fails, the translation remains visible. Retrying only the save without making another translation request is still upcoming in MVP issue [#6](https://github.com/ihafkenschiel/vkab/issues/6). Deleting vocabulary is likewise upcoming in issue [#7](https://github.com/ihafkenschiel/vkab/issues/7); the current review branch does not show a delete control.
 
 ### Not in the MVP
 
@@ -47,7 +53,7 @@ The browser sends an authenticated request to a same-origin translation endpoint
 
 Supabase decides whether a lookup is new or repeated at the database boundary. Lookup identity uses Unicode NFC normalization, removes leading and trailing whitespace, collapses internal whitespace, and compares lowercase text within the same learner and language direction. The stored display text remains NFC-normalized and whitespace-cleaned without discarding its original letter case.
 
-Translation and persistence remain separate outcomes: if saving fails, the translation stays visible and can be saved again without paying for another translation request.
+Translation and persistence remain separate outcomes: if saving fails, the translation stays visible. A save-only retry that avoids another paid translation request is part of upcoming MVP issue [#6](https://github.com/ihafkenschiel/vkab/issues/6).
 
 ## Cost target
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
-import { obtainLearnerSession } from "./session";
+import { getCurrentAccessToken, obtainLearnerSession } from "./session";
 import {
   browserTranslationClient,
   type TranslationClient,
@@ -155,10 +155,20 @@ export function App({
     setSaveStatus("idle");
     setIsTranslating(true);
 
+    let accessToken: string;
+
+    try {
+      accessToken = await getCurrentAccessToken(supabase);
+    } catch {
+      setTranslationError("Your session is unavailable. Reload and try again.");
+      setIsTranslating(false);
+      return;
+    }
+
     try {
       const response = await translationClient.translate(
         validation.value,
-        session.access_token,
+        accessToken,
       );
 
       setTranslation({

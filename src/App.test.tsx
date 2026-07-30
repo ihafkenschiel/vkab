@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -489,6 +490,135 @@ describe("vocabulary review", () => {
 });
 
 describe("phrase translation", () => {
+  it("uses the current refreshed access token for translation", async () => {
+    const getSession = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: "old-token",
+            user: { id: "learner-1" },
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: "refreshed-token",
+            user: { id: "learner-1" },
+          },
+        },
+        error: null,
+      });
+    const supabase = {
+      auth: {
+        getSession,
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi.fn().mockResolvedValue({ translatedText: "Dzień dobry" }),
+    } satisfies TranslationClient;
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "Good morning" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+
+    expect(await screen.findByText("Dzień dobry")).toBeVisible();
+    expect(translationClient.translate).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "Good morning" }),
+      "refreshed-token",
+    );
+    expect(translationClient.translate).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "old-token",
+    );
+    expect(getSession).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops safely when the current session is no longer available", async () => {
+    const getSession = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: "old-token",
+            user: { id: "learner-1" },
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { session: null }, error: null });
+    const supabase = {
+      auth: {
+        getSession,
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi.fn(),
+    } satisfies TranslationClient;
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "Good morning" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your session is unavailable. Reload and try again.",
+    );
+    expect(translationClient.translate).not.toHaveBeenCalled();
+    expect(getSession).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not expose current-session retrieval failures", async () => {
+    const getSession = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: "old-token",
+            user: { id: "learner-1" },
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { session: null },
+        error: new Error("private current session detail"),
+      });
+    const supabase = {
+      auth: {
+        getSession,
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi.fn(),
+    } satisfies TranslationClient;
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "Good morning" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Your session is unavailable. Reload and try again.",
+    );
+    expect(alert).not.toHaveTextContent("private current session detail");
+    expect(translationClient.translate).not.toHaveBeenCalled();
+    expect(getSession).toHaveBeenCalledTimes(2);
+  });
+
   it("automatically saves a successful translation for the current learner", async () => {
     const supabase = {
       auth: {
@@ -871,7 +1001,9 @@ describe("phrase translation", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("Translating");
     expect(submit).toBeDisabled();
-    expect(translationClient.translate).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect(translationClient.translate).toHaveBeenCalledOnce(),
+    );
 
     finishTranslation({ translatedText: "Dzień dobry" });
     expect(await screen.findByText("Dzień dobry")).toBeVisible();
