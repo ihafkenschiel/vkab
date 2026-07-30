@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it } from "vitest";
@@ -8,13 +8,7 @@ const learnerTwoId = "22222222-2222-4222-8222-222222222222";
 
 async function createVocabularyDatabase() {
   const database = await PGlite.create();
-  const migration = readFileSync(
-    resolve(
-      process.cwd(),
-      "supabase/migrations/20260729190000_create_vocabulary_entries.sql",
-    ),
-    "utf8",
-  );
+  const migrationDirectory = resolve(process.cwd(), "supabase/migrations");
 
   await database.exec(`
     create schema auth;
@@ -31,7 +25,11 @@ async function createVocabularyDatabase() {
       ('${learnerOneId}'),
       ('${learnerTwoId}');
   `);
-  await database.exec(migration);
+  for (const filename of readdirSync(migrationDirectory).sort()) {
+    await database.exec(
+      readFileSync(resolve(migrationDirectory, filename), "utf8"),
+    );
+  }
   await database.exec(`
     grant usage on schema public, auth to authenticated;
     grant select, insert, update, delete

@@ -233,7 +233,7 @@ describe("vocabulary review", () => {
           targetLanguage: "en",
           originalText: "Poproszę rachunek",
           translatedText: "The check, please",
-          lookupCount: 1,
+          lookupCount: 3,
           createdAt: "2026-07-29T13:00:00.000Z",
           lastLookedUpAt: "2026-07-29T13:00:00.000Z",
         },
@@ -267,9 +267,11 @@ describe("vocabulary review", () => {
     expect(entries[0]).toHaveTextContent("Poproszę rachunek");
     expect(entries[0]).toHaveTextContent("The check, please");
     expect(entries[0]).toHaveTextContent("Polish to English");
+    expect(entries[0]).toHaveTextContent("Looked up 3 times");
     expect(entries[1]).toHaveTextContent("Good morning");
     expect(entries[1]).toHaveTextContent("Dzień dobry");
     expect(entries[1]).toHaveTextContent("English to Polish");
+    expect(entries[1]).toHaveTextContent("Looked up once");
   });
 
   it("offers a direct way to translate when the vocabulary is empty", async () => {
@@ -374,6 +376,7 @@ describe("vocabulary review", () => {
         const saved: VocabularyEntry = {
           ...entry,
           id: "persisted-entry",
+          ownerId: "learner-1",
           lookupCount: 1,
           createdAt: "2026-07-29T12:00:00.000Z",
           lastLookedUpAt: "2026-07-29T12:00:00.000Z",
@@ -444,6 +447,7 @@ describe("vocabulary review", () => {
               const saved = {
                 ...entry,
                 id: "saved-entry",
+                ownerId: "learner-1",
                 lookupCount: 1,
                 createdAt: "2026-07-29T12:00:00.000Z",
                 lastLookedUpAt: "2026-07-29T12:00:00.000Z",
@@ -523,7 +527,6 @@ describe("phrase translation", () => {
 
     expect(await screen.findByText("Dzień dobry")).toBeVisible();
     expect(vocabularyRepository.save).toHaveBeenCalledWith({
-      ownerId: "learner-1",
       sourceLanguage: "en",
       targetLanguage: "pl",
       originalText: "Good morning",

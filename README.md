@@ -45,6 +45,8 @@ Keeping these out of version one makes it possible to validate the central idea 
 
 The browser sends an authenticated request to a same-origin translation endpoint. That endpoint validates the text and language codes, calls Google, and returns the translation without exposing the API key. The browser then records the successful lookup in Supabase under the current user's ID.
 
+Supabase decides whether a lookup is new or repeated at the database boundary. Lookup identity uses Unicode NFC normalization, removes leading and trailing whitespace, collapses internal whitespace, and compares lowercase text within the same learner and language direction. The stored display text remains NFC-normalized and whitespace-cleaned without discarding its original letter case.
+
 Translation and persistence remain separate outcomes: if saving fails, the translation stays visible and can be saved again without paying for another translation request.
 
 ## Cost target
@@ -86,9 +88,9 @@ GOOGLE_TRANSLATE_API_KEY=replace-with-a-restricted-server-key
 
 The Supabase publishable key is intended for public clients; a service-role key is not needed and must not be configured. Never place the Google key, a service-role key, or any other secret in a `VITE_` variable. Vite exposes those variables to browser code.
 
-### Apply the database migration
+### Apply the database migrations
 
-Vocabulary storage and its Row Level Security policies are defined in [`supabase/migrations/20260729190000_create_vocabulary_entries.sql`](./supabase/migrations/20260729190000_create_vocabulary_entries.sql). Anonymous Supabase users use the `authenticated` database role, and each policy limits access to rows owned by the current user.
+Vocabulary storage, atomic repeated-lookup updates, and Row Level Security policies are defined in [`supabase/migrations`](./supabase/migrations). Apply the files in filename order. Anonymous Supabase users use the `authenticated` database role, and each policy limits access to rows owned by the current user.
 
 With the Supabase CLI configured, apply the migration to a local stack:
 
@@ -97,7 +99,7 @@ supabase start
 supabase db reset
 ```
 
-To apply the same tracked migration to a linked Supabase project:
+To apply the same tracked migrations to a linked Supabase project:
 
 ```sh
 supabase link --project-ref your-project-ref

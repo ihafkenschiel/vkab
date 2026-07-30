@@ -198,6 +198,11 @@ h1 {
   line-height: 1.35;
 }
 
+.vocabulary-entry .vocabulary-count {
+  color: #64748b;
+  font-size: 0.8125rem;
+}
+
 .empty-vocabulary {
   padding: 1.25rem;
   border: 1px dashed #b9c1cf;

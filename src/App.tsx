@@ -173,7 +173,6 @@ export function App({
       setSaveStatus("saving");
       void activeVocabularyRepository
         .save({
-          ownerId: session.user.id,
           sourceLanguage: validation.value.sourceLanguage,
           targetLanguage: validation.value.targetLanguage,
           originalText: validation.value.text,
@@ -298,6 +297,11 @@ export function App({
                     </p>
                     <p>{entry.originalText}</p>
                     <strong>{entry.translatedText}</strong>
+                    <p className="vocabulary-count">
+                      {entry.lookupCount === 1
+                        ? "Looked up once"
+                        : `Looked up ${entry.lookupCount} times`}
+                    </p>
                   </li>
                 ))}
               </ul>

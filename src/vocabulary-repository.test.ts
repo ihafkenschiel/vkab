@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createSupabaseVocabularyRepository } from "./vocabulary-repository";
 
 describe("Supabase vocabulary repository", () => {
-  it("saves a new lookup with its owner, direction, normalized source, and initial count", async () => {
-    const single = vi.fn().mockResolvedValue({
+  it("saves through the authenticated atomic boundary without accepting an owner", async () => {
+    const rpc = vi.fn().mockResolvedValue({
       data: {
         id: "entry-1",
         owner_id: "learner-1",
@@ -20,30 +20,22 @@ describe("Supabase vocabulary repository", () => {
       },
       error: null,
     });
-    const select = vi.fn().mockReturnValue({ single });
-    const insert = vi.fn().mockReturnValue({ select });
-    const from = vi.fn().mockReturnValue({ insert });
     const repository = createSupabaseVocabularyRepository({
-      from,
+      rpc,
     } as unknown as SupabaseClient);
 
     const saved = await repository.save({
-      ownerId: "learner-1",
       sourceLanguage: "en",
       targetLanguage: "pl",
       originalText: "  Good   Morning  ",
       translatedText: "Dzień dobry",
     });
 
-    expect(from).toHaveBeenCalledWith("vocabulary_entries");
-    expect(insert).toHaveBeenCalledWith({
-      owner_id: "learner-1",
-      source_language: "en",
-      target_language: "pl",
-      original_text: "  Good   Morning  ",
-      normalized_original_text: "good morning",
-      translated_text: "Dzień dobry",
-      lookup_count: 1,
+    expect(rpc).toHaveBeenCalledWith("save_vocabulary_entry", {
+      p_source_language: "en",
+      p_target_language: "pl",
+      p_original_text: "  Good   Morning  ",
+      p_translated_text: "Dzień dobry",
     });
     expect(saved).toEqual({
       id: "entry-1",
@@ -56,6 +48,24 @@ describe("Supabase vocabulary repository", () => {
       createdAt: "2026-07-29T12:00:00.000Z",
       lastLookedUpAt: "2026-07-29T12:00:00.000Z",
     });
+  });
+
+  it("rejects a malformed save response with a safe message", async () => {
+    const repository = createSupabaseVocabularyRepository({
+      rpc: vi.fn().mockResolvedValue({
+        data: { id: "entry-1", private_detail: "should not escape" },
+        error: null,
+      }),
+    } as unknown as SupabaseClient);
+
+    await expect(
+      repository.save({
+        sourceLanguage: "en",
+        targetLanguage: "pl",
+        originalText: "Hello",
+        translatedText: "Cześć",
+      }),
+    ).rejects.toThrow("Vocabulary could not be saved.");
   });
 
   it("lists only the learner's entries from newest lookup to oldest", async () => {
