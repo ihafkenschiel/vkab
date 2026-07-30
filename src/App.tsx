@@ -108,7 +108,6 @@ export function App({
         sourceLanguage: validation.value.sourceLanguage,
         targetLanguage: validation.value.targetLanguage,
       });
-      setText(validation.value.text);
     } catch {
       setTranslationError("Translation is unavailable right now. Try again.");
     } finally {
@@ -250,7 +249,6 @@ export function App({
               <textarea
                 aria-describedby="phrase-guidance"
                 id="translation-text"
-                maxLength={300}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
                 rows={3}

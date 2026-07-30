@@ -380,6 +380,118 @@ describe("phrase translation", () => {
     expect(await screen.findByText("Dzień dobry")).toBeVisible();
   });
 
+  it("preserves newer form edits while a submitted translation finishes", async () => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
+          error: null,
+        }),
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    let finishTranslation!: (value: { translatedText: string }) => void;
+    const translationClient = {
+      translate: vi.fn().mockReturnValue(
+        new Promise<{ translatedText: string }>((resolve) => {
+          finishTranslation = resolve;
+        }),
+      ),
+    } satisfies TranslationClient;
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+    const phrase = await screen.findByRole("textbox", {
+      name: "Word or phrase",
+    });
+    fireEvent.change(phrase, { target: { value: "Good morning" } });
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+
+    fireEvent.change(phrase, { target: { value: "Where is the station?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Swap languages" }));
+    finishTranslation({ translatedText: "Dzień dobry" });
+
+    const result = await screen.findByRole("region", {
+      name: "Translation result",
+    });
+    expect(phrase).toHaveValue("Where is the station?");
+    expect(screen.getByRole("combobox", { name: "From" })).toHaveValue("pl");
+    expect(screen.getByRole("combobox", { name: "To" })).toHaveValue("en");
+    expect(within(result).getByText("Good morning")).toBeVisible();
+    expect(within(result).getByText("English to Polish")).toBeVisible();
+  });
+
+  it("allows a 300-character astral phrase to reach translation", async () => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
+          error: null,
+        }),
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi.fn().mockResolvedValue({ translatedText: "Uśmiech" }),
+    } satisfies TranslationClient;
+    const text = "😊".repeat(300);
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+    const phrase = await screen.findByRole("textbox", {
+      name: "Word or phrase",
+    });
+    fireEvent.change(phrase, { target: { value: text } });
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+
+    expect(phrase).not.toHaveAttribute("maxlength");
+    expect(await screen.findByText("Uśmiech")).toBeVisible();
+    expect(translationClient.translate).toHaveBeenCalledWith(
+      expect.objectContaining({ text }),
+      "learner-token",
+    );
+  });
+
+  it("rejects a 301-character astral phrase before translation", async () => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
+          error: null,
+        }),
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi.fn(),
+    } satisfies TranslationClient;
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "😊".repeat(301) } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Keep the phrase to 300 characters or fewer.",
+    );
+    expect(translationClient.translate).not.toHaveBeenCalled();
+  });
+
   it("shows a safe error when translation fails", async () => {
     const supabase = {
       auth: {

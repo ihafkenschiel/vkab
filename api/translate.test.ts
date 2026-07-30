@@ -59,6 +59,73 @@ describe("POST /api/translate", () => {
     expect(translate).not.toHaveBeenCalled();
   });
 
+  it("rejects raw tokens and other authorization schemes before authentication", async () => {
+    const authenticate = vi.fn().mockResolvedValue(true);
+    const translate = vi.fn().mockResolvedValue("Dzień dobry");
+    const handle = createTranslateHandler({ authenticate, translate });
+
+    for (const authorization of [
+      "learner-token",
+      "Basic learner-token",
+      "Bearer    ",
+    ]) {
+      const request = new Request("https://example.test/api/translate", {
+        method: "POST",
+        headers: {
+          Authorization: authorization,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Good morning",
+          sourceLanguage: "en",
+          targetLanguage: "pl",
+        }),
+      });
+
+      const response = await handle(request);
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({
+        code: "UNAUTHORIZED",
+        message: "Your session is not valid.",
+      });
+    }
+
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(translate).not.toHaveBeenCalled();
+  });
+
+  it("distinguishes authentication infrastructure failure from an invalid token", async () => {
+    const authenticate = vi
+      .fn()
+      .mockRejectedValue(new Error("private-auth-detail"));
+    const translate = vi.fn();
+    const handle = createTranslateHandler({ authenticate, translate });
+    const request = new Request("https://example.test/api/translate", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer learner-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: "Good morning",
+        sourceLanguage: "en",
+        targetLanguage: "pl",
+      }),
+    });
+
+    const response = await handle(request);
+
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body).toEqual({
+      code: "AUTH_UNAVAILABLE",
+      message: "Your session could not be verified. Try again.",
+    });
+    expect(JSON.stringify(body)).not.toContain("private-auth-detail");
+    expect(translate).not.toHaveBeenCalled();
+  });
+
   it("returns a safe error for malformed JSON", async () => {
     const authenticate = vi.fn().mockResolvedValue(true);
     const translate = vi.fn();

@@ -35,7 +35,7 @@ export function createGoogleTranslationGateway(
     };
     const translatedText = body.data?.translations?.[0]?.translatedText;
 
-    if (typeof translatedText !== "string" || !translatedText) {
+    if (typeof translatedText !== "string" || !translatedText.trim()) {
       throw new Error("Translation provider returned an invalid response.");
     }
 

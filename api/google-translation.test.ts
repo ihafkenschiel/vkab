@@ -56,4 +56,24 @@ describe("Google translation gateway", () => {
       }),
     ).rejects.toThrow("invalid response");
   });
+
+  it("rejects a whitespace-only provider translation", async () => {
+    const fetchProvider = vi.fn().mockResolvedValue(
+      Response.json({
+        data: { translations: [{ translatedText: "   " }] },
+      }),
+    );
+    const translate = createGoogleTranslationGateway(
+      "server-api-key",
+      fetchProvider,
+    );
+
+    await expect(
+      translate({
+        text: "Good morning",
+        sourceLanguage: "en",
+        targetLanguage: "pl",
+      }),
+    ).rejects.toThrow("invalid response");
+  });
 });

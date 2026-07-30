@@ -26,9 +26,9 @@ export function createTranslateHandler(dependencies: TranslateDependencies) {
       );
     }
 
-    const accessToken = request.headers
-      .get("Authorization")
-      ?.replace(/^Bearer\s+/i, "");
+    const authorization = request.headers.get("Authorization") ?? "";
+    const bearerMatch = /^Bearer\s+(\S+)$/i.exec(authorization);
+    const accessToken = bearerMatch?.[1];
 
     let authenticated = false;
 
@@ -37,7 +37,13 @@ export function createTranslateHandler(dependencies: TranslateDependencies) {
         accessToken && (await dependencies.authenticate(accessToken)),
       );
     } catch {
-      authenticated = false;
+      return jsonResponse(
+        {
+          code: "AUTH_UNAVAILABLE",
+          message: "Your session could not be verified. Try again.",
+        },
+        503,
+      );
     }
 
     if (!authenticated) {
