@@ -165,6 +165,62 @@ h1 {
   color: #172033;
 }
 
+.vocabulary-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.vocabulary-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vocabulary-entry {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1rem;
+  border: 1px solid #dfe3eb;
+  border-radius: 0.75rem;
+  background: #ffffff;
+}
+
+.vocabulary-entry p,
+.vocabulary-entry strong {
+  margin: 0;
+}
+
+.vocabulary-entry strong {
+  color: #0f172a;
+  font-size: 1.125rem;
+  line-height: 1.35;
+}
+
+.empty-vocabulary {
+  padding: 1.25rem;
+  border: 1px dashed #b9c1cf;
+  border-radius: 0.75rem;
+  text-align: center;
+}
+
+.empty-vocabulary h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.25rem;
+}
+
+.empty-vocabulary p {
+  margin: 0.5rem 0 0;
+  color: #59647a;
+  line-height: 1.5;
+}
+
+.empty-vocabulary .primary-action {
+  max-width: 18rem;
+}
+
 .translation-form {
   display: grid;
   gap: 1rem;

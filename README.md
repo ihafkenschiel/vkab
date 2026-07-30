@@ -86,6 +86,26 @@ GOOGLE_TRANSLATE_API_KEY=replace-with-a-restricted-server-key
 
 The Supabase publishable key is intended for public clients; a service-role key is not needed and must not be configured. Never place the Google key, a service-role key, or any other secret in a `VITE_` variable. Vite exposes those variables to browser code.
 
+### Apply the database migration
+
+Vocabulary storage and its Row Level Security policies are defined in [`supabase/migrations/20260729190000_create_vocabulary_entries.sql`](./supabase/migrations/20260729190000_create_vocabulary_entries.sql). Anonymous Supabase users use the `authenticated` database role, and each policy limits access to rows owned by the current user.
+
+With the Supabase CLI configured, apply the migration to a local stack:
+
+```sh
+supabase start
+supabase db reset
+```
+
+To apply the same tracked migration to a linked Supabase project:
+
+```sh
+supabase link --project-ref your-project-ref
+supabase db push
+```
+
+Use the project reference for the intended environment and allow the CLI to obtain credentials through its normal login or prompt. Do not store database passwords, access tokens, or service-role keys in the repository. Production application and RLS verification are part of the deployment checklist.
+
 Start the application:
 
 ```sh

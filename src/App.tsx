@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
 import { obtainLearnerSession } from "./session";
@@ -14,18 +14,30 @@ import {
   writeLanguageDirection,
   type DirectionStorage,
 } from "./language-direction";
+import {
+  createSupabaseVocabularyRepository,
+  type VocabularyEntry,
+  type VocabularyRepository,
+} from "./vocabulary-repository";
 
 interface AppProps {
   supabase: SupabaseClient;
   translationClient?: TranslationClient;
   directionStorage?: DirectionStorage;
+  vocabularyRepository?: VocabularyRepository;
 }
 
 export function App({
   supabase,
   translationClient = browserTranslationClient,
   directionStorage = window.localStorage,
+  vocabularyRepository,
 }: AppProps) {
+  const activeVocabularyRepository = useMemo(
+    () =>
+      vocabularyRepository ?? createSupabaseVocabularyRepository(supabase),
+    [supabase, vocabularyRepository],
+  );
   const [sessionStatus, setSessionStatus] = useState<
     "loading" | "ready" | "error"
   >("loading");
@@ -45,9 +57,17 @@ export function App({
   >(null);
   const [translationError, setTranslationError] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const saveAttemptRef = useRef(0);
   const [direction, setDirection] = useState(() =>
     readLanguageDirection(directionStorage),
   );
+  const [vocabularyState, setVocabularyState] = useState<{
+    status: "idle" | "loading" | "ready" | "error";
+    entries: VocabularyEntry[];
+  }>({ status: "idle", entries: [] });
 
   useEffect(() => {
     let isCurrent = true;
@@ -70,6 +90,32 @@ export function App({
     };
   }, [attempt, supabase]);
 
+  useEffect(() => {
+    if (activeView !== "vocabulary" || !learnerSession) {
+      return;
+    }
+
+    let isCurrent = true;
+    setVocabularyState({ status: "loading", entries: [] });
+
+    void activeVocabularyRepository
+      .list(learnerSession.user.id)
+      .then((entries) => {
+        if (isCurrent) {
+          setVocabularyState({ status: "ready", entries });
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setVocabularyState({ status: "error", entries: [] });
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [activeView, activeVocabularyRepository, learnerSession]);
+
   function retrySession() {
     setSessionStatus("loading");
     setAttempt((currentAttempt) => currentAttempt + 1);
@@ -79,6 +125,12 @@ export function App({
     event.preventDefault();
 
     if (isTranslating) {
+      return;
+    }
+
+    const session = learnerSession;
+    if (!session) {
+      setTranslationError("Your session is unavailable. Reload and try again.");
       return;
     }
 
@@ -94,12 +146,13 @@ export function App({
     }
 
     setTranslationError(null);
+    setSaveStatus("idle");
     setIsTranslating(true);
 
     try {
       const response = await translationClient.translate(
         validation.value,
-        learnerSession?.access_token ?? "",
+        session.access_token,
       );
 
       setTranslation({
@@ -108,6 +161,28 @@ export function App({
         sourceLanguage: validation.value.sourceLanguage,
         targetLanguage: validation.value.targetLanguage,
       });
+
+      const saveAttempt = saveAttemptRef.current + 1;
+      saveAttemptRef.current = saveAttempt;
+      setSaveStatus("saving");
+      void activeVocabularyRepository
+        .save({
+          ownerId: session.user.id,
+          sourceLanguage: validation.value.sourceLanguage,
+          targetLanguage: validation.value.targetLanguage,
+          originalText: validation.value.text,
+          translatedText: response.translatedText,
+        })
+        .then(() => {
+          if (saveAttemptRef.current === saveAttempt) {
+            setSaveStatus("saved");
+          }
+        })
+        .catch(() => {
+          if (saveAttemptRef.current === saveAttempt) {
+            setSaveStatus("error");
+          }
+        });
     } catch {
       setTranslationError("Translation is unavailable right now. Try again.");
     } finally {
@@ -189,13 +264,52 @@ export function App({
           <h1 id="view-title">{viewTitle}</h1>
         </div>
         {activeView === "vocabulary" ? (
-          <aside className="privacy-note" role="note">
-            <strong>Browser-only vocabulary</strong>
-            <span>
-              Clearing browser data or using another device can make this
-              vocabulary inaccessible.
-            </span>
-          </aside>
+          <div className="vocabulary-view">
+            <aside className="privacy-note" role="note">
+              <strong>Private travel vocabulary</strong>
+              <span>
+                Clearing browser data or using another device can make this
+                anonymous vocabulary inaccessible.
+              </span>
+            </aside>
+            {vocabularyState.status === "loading" ? (
+              <p role="status">Loading vocabulary...</p>
+            ) : null}
+            {vocabularyState.status === "error" ? (
+              <p className="form-error" role="alert">
+                Vocabulary is unavailable right now. Try again later.
+              </p>
+            ) : null}
+            {vocabularyState.status === "ready" &&
+            vocabularyState.entries.length > 0 ? (
+              <ul className="vocabulary-list" aria-label="Saved vocabulary">
+                {vocabularyState.entries.map((entry) => (
+                  <li className="vocabulary-entry" key={entry.id}>
+                    <p className="translation-direction">
+                      {languageName(entry.sourceLanguage)} to{" "}
+                      {languageName(entry.targetLanguage)}
+                    </p>
+                    <p>{entry.originalText}</p>
+                    <strong>{entry.translatedText}</strong>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {vocabularyState.status === "ready" &&
+            vocabularyState.entries.length === 0 ? (
+              <section className="empty-vocabulary">
+                <h2>No saved vocabulary yet</h2>
+                <p>Translate something useful and it will appear here.</p>
+                <button
+                  className="primary-action"
+                  type="button"
+                  onClick={() => setActiveView("translate")}
+                >
+                  Translate a phrase
+                </button>
+              </section>
+            ) : null}
+          </div>
         ) : (
           <form className="translation-form" onSubmit={submitTranslation}>
             <div className="language-direction" aria-label="Language direction">
@@ -282,6 +396,17 @@ export function App({
                 </p>
                 <p>{translation.originalText}</p>
                 <strong>{translation.translatedText}</strong>
+                {saveStatus === "saving" ? (
+                  <p role="status">Saving to vocabulary...</p>
+                ) : null}
+                {saveStatus === "saved" ? (
+                  <p role="status">Saved to vocabulary</p>
+                ) : null}
+                {saveStatus === "error" ? (
+                  <p className="form-error" role="alert">
+                    Translation shown, but vocabulary could not be saved.
+                  </p>
+                ) : null}
               </section>
             ) : null}
           </form>
