@@ -4,7 +4,7 @@ VKab is a practical language-learning app built around the words and phrases peo
 
 Instead of choosing a fixed curriculum, the first version turns translation history into a personal vocabulary list: look something up, use it, and keep it for later. The longer-term goal is to turn that vocabulary into effective practice and complement it with community-built, boots-on-the-ground language packs.
 
-The project is in the planning stage. The complete MVP requirements are tracked in [PRD: Google Translate vocabulary lookup MVP](https://github.com/ihafkenschiel/vkab/issues/1).
+The MVP is under active development. Its complete requirements are tracked in [PRD: Google Translate vocabulary lookup MVP](https://github.com/ihafkenschiel/vkab/issues/1).
 
 ## MVP
 
@@ -60,6 +60,7 @@ Requirements:
 - Node.js 20.19 or newer
 - pnpm 10 or newer
 - A Supabase project with anonymous sign-ins enabled
+- A Google Cloud project with the Cloud Translation API enabled
 
 Install dependencies and create a local environment file:
 
@@ -68,20 +69,30 @@ pnpm install
 cp .env.example .env.local
 ```
 
-Replace the placeholders in `.env.local` with the project's Supabase URL and publishable key. These are the only Supabase values the browser needs:
+Replace the placeholders in `.env.local`. The Vite-prefixed values configure the browser session:
 
 ```text
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
 ```
 
-Never place a secret key or service-role key in a `VITE_` variable. Vite exposes those variables to browser code.
+The translation endpoint needs the same public Supabase project values and a restricted Google Cloud Translation key:
+
+```text
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
+GOOGLE_TRANSLATE_API_KEY=replace-with-a-restricted-server-key
+```
+
+The Supabase publishable key is intended for public clients; a service-role key is not needed and must not be configured. Never place the Google key, a service-role key, or any other secret in a `VITE_` variable. Vite exposes those variables to browser code.
 
 Start the application:
 
 ```sh
 pnpm dev
 ```
+
+`pnpm dev` runs the browser application. Use the Vercel development environment when testing the `/api/translate` function locally.
 
 The first visit creates an anonymous Supabase identity. Supabase stores that session in the browser and restores it on refresh. Clearing browser data or changing devices can make anonymous vocabulary inaccessible.
 

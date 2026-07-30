@@ -27,6 +27,11 @@ button {
   font: inherit;
 }
 
+select,
+textarea {
+  font: inherit;
+}
+
 button:focus-visible {
   outline: 3px solid #155eef;
   outline-offset: 3px;
@@ -160,6 +165,134 @@ h1 {
   color: #172033;
 }
 
+.translation-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.language-direction {
+  display: grid;
+  grid-template-areas:
+    "source target"
+    "swap swap";
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.language-field,
+.translation-input {
+  display: grid;
+  gap: 0.45rem;
+  color: #3d4960;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.language-field--source {
+  grid-area: source;
+}
+
+.language-field--target {
+  grid-area: target;
+}
+
+.language-field select,
+.translation-input textarea {
+  width: 100%;
+  border: 1px solid #b9c1cf;
+  border-radius: 0.75rem;
+  color: #172033;
+  background: #ffffff;
+}
+
+.language-field select {
+  min-height: 3.25rem;
+  padding: 0.7rem 2.25rem 0.7rem 0.75rem;
+}
+
+.translation-input textarea {
+  min-height: 7rem;
+  padding: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.language-field select:focus-visible,
+.translation-input textarea:focus-visible {
+  outline: 3px solid #155eef;
+  outline-offset: 2px;
+}
+
+.swap-action {
+  grid-area: swap;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #b9c1cf;
+  border-radius: 0.75rem;
+  color: #0b45b5;
+  background: #ffffff;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.field-guidance {
+  color: #6b7487;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.translation-form .primary-action {
+  margin-top: 0;
+}
+
+.primary-action:disabled {
+  border-color: #91a3c5;
+  background: #91a3c5;
+  cursor: wait;
+}
+
+.form-error {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-left: 4px solid #b42318;
+  border-radius: 0.25rem 0.75rem 0.75rem 0.25rem;
+  color: #8a1c13;
+  background: #fff2f0;
+  line-height: 1.5;
+}
+
+.translation-form [role="status"] {
+  margin: 0;
+  color: #59647a;
+}
+
+.translation-result {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1.1rem;
+  border: 1px solid #bcd0ff;
+  border-radius: 0.75rem;
+  background: #f3f6ff;
+}
+
+.translation-result p,
+.translation-result strong {
+  margin: 0;
+}
+
+.translation-result strong {
+  color: #0f172a;
+  font-size: clamp(1.35rem, 5vw, 1.8rem);
+  line-height: 1.25;
+}
+
+.translation-direction {
+  color: #0b45b5;
+  font-size: 0.8125rem;
+  font-weight: 760;
+}
+
 .centered-state {
   display: grid;
   min-height: 100vh;
@@ -229,6 +362,16 @@ h1 {
   .view-panel {
     margin-top: 1.5rem;
     padding: 2rem;
+  }
+
+  .language-direction {
+    grid-template-areas: "source swap target";
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .swap-action {
+    min-width: 8.5rem;
   }
 }
 

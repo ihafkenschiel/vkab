@@ -1,13 +1,31 @@
 import { useEffect, useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
 import { obtainLearnerSession } from "./session";
+import {
+  browserTranslationClient,
+  type TranslationClient,
+  type TranslationResponse,
+} from "./translation-client";
+import { validateTranslationInput } from "./translation";
+import type { LanguageCode } from "./translation";
+import {
+  readLanguageDirection,
+  writeLanguageDirection,
+  type DirectionStorage,
+} from "./language-direction";
 
 interface AppProps {
   supabase: SupabaseClient;
+  translationClient?: TranslationClient;
+  directionStorage?: DirectionStorage;
 }
 
-export function App({ supabase }: AppProps) {
+export function App({
+  supabase,
+  translationClient = browserTranslationClient,
+  directionStorage = window.localStorage,
+}: AppProps) {
   const [sessionStatus, setSessionStatus] = useState<
     "loading" | "ready" | "error"
   >("loading");
@@ -15,13 +33,29 @@ export function App({ supabase }: AppProps) {
   const [activeView, setActiveView] = useState<"translate" | "vocabulary">(
     "translate",
   );
+  const [learnerSession, setLearnerSession] = useState<Session | null>(null);
+  const [text, setText] = useState("");
+  const [translation, setTranslation] = useState<
+    | (TranslationResponse & {
+        originalText: string;
+        sourceLanguage: LanguageCode;
+        targetLanguage: LanguageCode;
+      })
+    | null
+  >(null);
+  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [direction, setDirection] = useState(() =>
+    readLanguageDirection(directionStorage),
+  );
 
   useEffect(() => {
     let isCurrent = true;
 
     void obtainLearnerSession(supabase)
-      .then(() => {
+      .then((session) => {
         if (isCurrent) {
+          setLearnerSession(session);
           setSessionStatus("ready");
         }
       })
@@ -39,6 +73,58 @@ export function App({ supabase }: AppProps) {
   function retrySession() {
     setSessionStatus("loading");
     setAttempt((currentAttempt) => currentAttempt + 1);
+  }
+
+  async function submitTranslation(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isTranslating) {
+      return;
+    }
+
+    const validation = validateTranslationInput({
+      text,
+      sourceLanguage: direction.sourceLanguage,
+      targetLanguage: direction.targetLanguage,
+    });
+
+    if (!validation.ok) {
+      setTranslationError(validation.error.message);
+      return;
+    }
+
+    setTranslationError(null);
+    setIsTranslating(true);
+
+    try {
+      const response = await translationClient.translate(
+        validation.value,
+        learnerSession?.access_token ?? "",
+      );
+
+      setTranslation({
+        ...response,
+        originalText: validation.value.text,
+        sourceLanguage: validation.value.sourceLanguage,
+        targetLanguage: validation.value.targetLanguage,
+      });
+      setText(validation.value.text);
+    } catch {
+      setTranslationError("Translation is unavailable right now. Try again.");
+    } finally {
+      setIsTranslating(false);
+    }
+  }
+
+  function updateDirection(nextDirection: typeof direction) {
+    setDirection(nextDirection);
+    writeLanguageDirection(directionStorage, nextDirection);
+    setTranslation(null);
+    setTranslationError(null);
+  }
+
+  function languageName(code: LanguageCode) {
+    return code === "en" ? "English" : "Polish";
   }
 
   if (sessionStatus === "loading") {
@@ -111,7 +197,97 @@ export function App({ supabase }: AppProps) {
               vocabulary inaccessible.
             </span>
           </aside>
-        ) : null}
+        ) : (
+          <form className="translation-form" onSubmit={submitTranslation}>
+            <div className="language-direction" aria-label="Language direction">
+              <label className="language-field language-field--source">
+                From
+                <select
+                  name="sourceLanguage"
+                  value={direction.sourceLanguage}
+                  onChange={(event) =>
+                    updateDirection({
+                      ...direction,
+                      sourceLanguage: event.target.value as LanguageCode,
+                    })
+                  }
+                >
+                  <option value="en">English</option>
+                  <option value="pl">Polish</option>
+                </select>
+              </label>
+              <button
+                className="swap-action"
+                type="button"
+                onClick={() =>
+                  updateDirection({
+                    sourceLanguage: direction.targetLanguage,
+                    targetLanguage: direction.sourceLanguage,
+                  })
+                }
+              >
+                Swap languages
+              </button>
+              <label className="language-field language-field--target">
+                To
+                <select
+                  name="targetLanguage"
+                  value={direction.targetLanguage}
+                  onChange={(event) =>
+                    updateDirection({
+                      ...direction,
+                      targetLanguage: event.target.value as LanguageCode,
+                    })
+                  }
+                >
+                  <option value="en">English</option>
+                  <option value="pl">Polish</option>
+                </select>
+              </label>
+            </div>
+            <div className="translation-input">
+              <label htmlFor="translation-text">Word or phrase</label>
+              <textarea
+                aria-describedby="phrase-guidance"
+                id="translation-text"
+                maxLength={300}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                rows={3}
+              />
+              <span id="phrase-guidance" className="field-guidance">
+                300 characters max
+              </span>
+            </div>
+            <button
+              className="primary-action"
+              type="submit"
+              disabled={isTranslating}
+            >
+              {isTranslating ? "Translating..." : "Translate phrase"}
+            </button>
+            {isTranslating ? <p role="status">Translating...</p> : null}
+            {translationError ? (
+              <p className="form-error" role="alert">
+                {translationError}
+              </p>
+            ) : null}
+            {translation ? (
+              <section
+                className="translation-result"
+                aria-label="Translation result"
+                aria-live="polite"
+              >
+                <p className="translation-direction">
+                  {languageName(translation.sourceLanguage)} to{" "}
+                  {languageName(translation.targetLanguage)}
+                </p>
+                <p>{translation.originalText}</p>
+                <strong>{translation.translatedText}</strong>
+              </section>
+            ) : null}
+          </form>
+        )}
       </section>
     </main>
   );

@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
+import type { TranslationClient } from "./translation-client";
 
 describe("anonymous learner session", () => {
   it("shows the ready application shell for an existing session", async () => {
@@ -193,5 +194,224 @@ describe("anonymous learner session", () => {
     expect(screen.getByRole("note")).toHaveTextContent(
       "Clearing browser data or using another device can make this vocabulary inaccessible.",
     );
+  });
+});
+
+describe("phrase translation", () => {
+  it("translates a short phrase in the selected language direction", async () => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
+          error: null,
+        }),
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi.fn().mockResolvedValue({ translatedText: "Dzień dobry" }),
+    } satisfies TranslationClient;
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "  Good morning  " } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+
+    const result = await screen.findByRole("region", {
+      name: "Translation result",
+    });
+    expect(within(result).getByText("Dzień dobry")).toBeVisible();
+    expect(within(result).getByText("Good morning")).toBeVisible();
+    expect(within(result).getByText("English to Polish")).toBeVisible();
+    expect(translationClient.translate).toHaveBeenCalledWith(
+      {
+        text: "Good morning",
+        sourceLanguage: "en",
+        targetLanguage: "pl",
+      },
+      "learner-token",
+    );
+  });
+
+  it("rejects an empty phrase before calling the translation service", async () => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
+          error: null,
+        }),
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi.fn(),
+    } satisfies TranslationClient;
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "   " } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Enter a word or phrase to translate.",
+    );
+    expect(translationClient.translate).not.toHaveBeenCalled();
+  });
+
+  it("swaps languages and restores the last direction", async () => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
+          error: null,
+        }),
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi.fn(),
+    } satisfies TranslationClient;
+    const values = new Map<string, string>();
+    const directionStorage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+
+    const firstRender = render(
+      <App
+        supabase={supabase}
+        translationClient={translationClient}
+        directionStorage={directionStorage}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("combobox", { name: "From" }),
+    ).toHaveValue("en");
+    expect(screen.getByRole("combobox", { name: "To" })).toHaveValue("pl");
+
+    fireEvent.click(screen.getByRole("button", { name: "Swap languages" }));
+
+    expect(screen.getByRole("combobox", { name: "From" })).toHaveValue("pl");
+    expect(screen.getByRole("combobox", { name: "To" })).toHaveValue("en");
+    expect([...values.values()]).toEqual([
+      JSON.stringify({
+        version: 1,
+        sourceLanguage: "pl",
+        targetLanguage: "en",
+      }),
+    ]);
+
+    firstRender.unmount();
+    render(
+      <App
+        supabase={supabase}
+        translationClient={translationClient}
+        directionStorage={directionStorage}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("combobox", { name: "From" }),
+    ).toHaveValue("pl");
+    expect(screen.getByRole("combobox", { name: "To" })).toHaveValue("en");
+  });
+
+  it("announces pending work and prevents duplicate translation requests", async () => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
+          error: null,
+        }),
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    let finishTranslation!: (value: { translatedText: string }) => void;
+    const translationClient = {
+      translate: vi.fn().mockReturnValue(
+        new Promise<{ translatedText: string }>((resolve) => {
+          finishTranslation = resolve;
+        }),
+      ),
+    } satisfies TranslationClient;
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "Good morning" } },
+    );
+    const submit = screen.getByRole("button", { name: "Translate phrase" });
+
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Translating");
+    expect(submit).toBeDisabled();
+    expect(translationClient.translate).toHaveBeenCalledOnce();
+
+    finishTranslation({ translatedText: "Dzień dobry" });
+    expect(await screen.findByText("Dzień dobry")).toBeVisible();
+  });
+
+  it("shows a safe error when translation fails", async () => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
+          error: null,
+        }),
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi
+        .fn()
+        .mockRejectedValue(new Error("private-provider-detail")),
+    } satisfies TranslationClient;
+
+    render(<App supabase={supabase} translationClient={translationClient} />);
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "Good morning" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Translation is unavailable right now. Try again.",
+    );
+    expect(alert).not.toHaveTextContent("private-provider-detail");
   });
 });
