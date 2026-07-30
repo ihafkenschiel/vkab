@@ -70,13 +70,13 @@ describe("vocabulary migration contract", () => {
       "constraint vocabulary_direction_differs check (source_language <> target_language)",
     );
     expect(definition).toContain(
-      "constraint vocabulary_original_not_blank check (length(btrim(original_text)) > 0)",
+      "constraint vocabulary_original_not_blank check (original_text ~ '[^[:space:]]')",
     );
     expect(definition).toContain(
-      "constraint vocabulary_normalized_not_blank check (length(btrim(normalized_original_text)) > 0)",
+      "constraint vocabulary_normalized_not_blank check (normalized_original_text ~ '[^[:space:]]')",
     );
     expect(definition).toContain(
-      "constraint vocabulary_translation_not_blank check (length(btrim(translated_text)) > 0)",
+      "constraint vocabulary_translation_not_blank check (translated_text ~ '[^[:space:]]')",
     );
     expect(definition).toContain(
       "constraint vocabulary_lookup_count_positive check (lookup_count >= 1)",

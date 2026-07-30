@@ -178,4 +178,71 @@ describe("vocabulary row-level security", () => {
       await database.close();
     }
   });
+
+  it("rejects whitespace-only vocabulary fields while accepting legitimate Unicode text", async () => {
+    const database = await createVocabularyDatabase();
+    const whitespaceValues = ["   ", "\t\t", "\n\n"];
+    const fields = [
+      "original_text",
+      "normalized_original_text",
+      "translated_text",
+    ] as const;
+
+    try {
+      for (const field of fields) {
+        for (const whitespace of whitespaceValues) {
+          const values = {
+            original_text: "Where is the cafe?",
+            normalized_original_text: "where is the cafe?",
+            translated_text: "Gdzie jest kawiarnia?",
+          };
+          values[field] = whitespace;
+
+          await expect(
+            queryAsUser(
+              database,
+              learnerOneId,
+              `insert into public.vocabulary_entries (
+                owner_id,
+                source_language,
+                target_language,
+                original_text,
+                normalized_original_text,
+                translated_text
+              ) values ($1, 'en', 'pl', $2, $3, $4)`,
+              [
+                learnerOneId,
+                values.original_text,
+                values.normalized_original_text,
+                values.translated_text,
+              ],
+            ),
+          ).rejects.toThrow(/check constraint/i);
+        }
+      }
+
+      const accepted = await queryAsUser<{ original_text: string }>(
+        database,
+        learnerOneId,
+        `insert into public.vocabulary_entries (
+          owner_id,
+          source_language,
+          target_language,
+          original_text,
+          normalized_original_text,
+          translated_text
+        ) values ($1, 'en', 'pl', $2, $3, $4)
+        returning original_text`,
+        [
+          learnerOneId,
+          "Where’s the café?",
+          "where’s the café?",
+          "Gdzie jest kawiarnia?",
+        ],
+      );
+      expect(accepted.rows).toEqual([{ original_text: "Where’s the café?" }]);
+    } finally {
+      await database.close();
+    }
+  });
 });

@@ -11,7 +11,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import type { TranslationClient } from "./translation-client";
-import type { VocabularyRepository } from "./vocabulary-repository";
+import type {
+  VocabularyEntry,
+  VocabularyRepository,
+} from "./vocabulary-repository";
 
 describe("anonymous learner session", () => {
   it("shows the ready application shell for an existing session", async () => {
@@ -345,42 +348,57 @@ describe("vocabulary review", () => {
     expect(alert).not.toHaveTextContent("private table detail");
   });
 
-  it("reloads remotely stored vocabulary after the application remounts", async () => {
+  it("reloads a translated phrase from the shared repository after remount", async () => {
     const supabase = {
       auth: {
         getSession: vi.fn().mockResolvedValue({
-          data: { session: { user: { id: "learner-1" } } },
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
           error: null,
         }),
         signInAnonymously: vi.fn(),
       },
     } as unknown as SupabaseClient;
-    const persistedEntry = {
-      id: "persisted-entry",
-      ownerId: "learner-1",
-      sourceLanguage: "en" as const,
-      targetLanguage: "pl" as const,
-      originalText: "Where is the station?",
-      translatedText: "Gdzie jest stacja?",
-      lookupCount: 1,
-      createdAt: "2026-07-29T12:00:00.000Z",
-      lastLookedUpAt: "2026-07-29T12:00:00.000Z",
-    };
+    const translationClient = {
+      translate: vi
+        .fn()
+        .mockResolvedValue({ translatedText: "Gdzie jest stacja?" }),
+    } satisfies TranslationClient;
+    const storedEntries: VocabularyEntry[] = [];
     const vocabularyRepository = {
-      save: vi.fn(),
-      list: vi.fn().mockResolvedValue([persistedEntry]),
+      save: vi.fn().mockImplementation(async (entry) => {
+        const saved: VocabularyEntry = {
+          ...entry,
+          id: "persisted-entry",
+          lookupCount: 1,
+          createdAt: "2026-07-29T12:00:00.000Z",
+          lastLookedUpAt: "2026-07-29T12:00:00.000Z",
+        };
+        storedEntries.push(saved);
+        return saved;
+      }),
+      list: vi.fn().mockImplementation(async (ownerId) =>
+        storedEntries.filter((entry) => entry.ownerId === ownerId),
+      ),
     } satisfies VocabularyRepository;
 
     const firstRender = render(
       <App
         supabase={supabase}
+        translationClient={translationClient}
         vocabularyRepository={vocabularyRepository}
       />,
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Vocabulary" }),
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "Where is the station?" } },
     );
-    expect(await screen.findByText("Gdzie jest stacja?")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+    expect(await screen.findByText("Saved to vocabulary")).toBeVisible();
     firstRender.unmount();
 
     render(
@@ -394,6 +412,74 @@ describe("vocabulary review", () => {
     );
 
     expect(await screen.findByText("Gdzie jest stacja?")).toBeVisible();
+    expect(vocabularyRepository.save).toHaveBeenCalledOnce();
+    expect(vocabularyRepository.list).toHaveBeenCalledWith("learner-1");
+  });
+
+  it("refreshes an open vocabulary view when a pending save succeeds", async () => {
+    const supabase = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "learner-token",
+              user: { id: "learner-1" },
+            },
+          },
+          error: null,
+        }),
+        signInAnonymously: vi.fn(),
+      },
+    } as unknown as SupabaseClient;
+    const translationClient = {
+      translate: vi.fn().mockResolvedValue({ translatedText: "Dzień dobry" }),
+    } satisfies TranslationClient;
+    const storedEntries: VocabularyEntry[] = [];
+    let finishSave!: () => void;
+    const vocabularyRepository = {
+      save: vi.fn().mockImplementation(
+        (entry) =>
+          new Promise((resolve) => {
+            finishSave = () => {
+              const saved = {
+                ...entry,
+                id: "saved-entry",
+                lookupCount: 1,
+                createdAt: "2026-07-29T12:00:00.000Z",
+                lastLookedUpAt: "2026-07-29T12:00:00.000Z",
+              };
+              storedEntries.push(saved);
+              resolve(saved);
+            };
+          }),
+      ),
+      list: vi.fn().mockImplementation(async (ownerId) =>
+        storedEntries.filter((entry) => entry.ownerId === ownerId),
+      ),
+    } as unknown as VocabularyRepository;
+
+    render(
+      <App
+        supabase={supabase}
+        translationClient={translationClient}
+        vocabularyRepository={vocabularyRepository}
+      />,
+    );
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Word or phrase" }),
+      { target: { value: "Good morning" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Translate phrase" }));
+    expect(await screen.findByText("Dzień dobry")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Vocabulary" }));
+    expect(
+      await screen.findByRole("heading", { name: "No saved vocabulary yet" }),
+    ).toBeVisible();
+
+    await act(async () => finishSave());
+
+    expect(await screen.findByText("Dzień dobry")).toBeVisible();
     expect(vocabularyRepository.list).toHaveBeenCalledTimes(2);
   });
 });

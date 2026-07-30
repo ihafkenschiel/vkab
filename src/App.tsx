@@ -68,6 +68,7 @@ export function App({
     status: "idle" | "loading" | "ready" | "error";
     entries: VocabularyEntry[];
   }>({ status: "idle", entries: [] });
+  const [vocabularyRevision, setVocabularyRevision] = useState(0);
 
   useEffect(() => {
     let isCurrent = true;
@@ -114,7 +115,12 @@ export function App({
     return () => {
       isCurrent = false;
     };
-  }, [activeView, activeVocabularyRepository, learnerSession]);
+  }, [
+    activeView,
+    activeVocabularyRepository,
+    learnerSession,
+    vocabularyRevision,
+  ]);
 
   function retrySession() {
     setSessionStatus("loading");
@@ -174,6 +180,7 @@ export function App({
           translatedText: response.translatedText,
         })
         .then(() => {
+          setVocabularyRevision((currentRevision) => currentRevision + 1);
           if (saveAttemptRef.current === saveAttempt) {
             setSaveStatus("saved");
           }

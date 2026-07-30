@@ -16,11 +16,11 @@ create table public.vocabulary_entries (
   constraint vocabulary_direction_differs
     check (source_language <> target_language),
   constraint vocabulary_original_not_blank
-    check (length(btrim(original_text)) > 0),
+    check (original_text ~ '[^[:space:]]'),
   constraint vocabulary_normalized_not_blank
-    check (length(btrim(normalized_original_text)) > 0),
+    check (normalized_original_text ~ '[^[:space:]]'),
   constraint vocabulary_translation_not_blank
-    check (length(btrim(translated_text)) > 0),
+    check (translated_text ~ '[^[:space:]]'),
   constraint vocabulary_lookup_count_positive
     check (lookup_count >= 1),
   constraint vocabulary_timestamp_order
