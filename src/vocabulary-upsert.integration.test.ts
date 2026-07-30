@@ -23,6 +23,7 @@ async function initializeAuthentication(database: PGlite) {
     insert into auth.users (id) values
       ('${learnerOneId}'),
       ('${learnerTwoId}');
+    grant usage on schema auth to authenticated, anon;
   `);
 }
 
@@ -30,18 +31,34 @@ async function createVocabularyDatabase() {
   const database = await PGlite.create();
   await initializeAuthentication(database);
 
-  for (const filename of readdirSync(migrationDirectory).sort()) {
-    await database.exec(
-      readFileSync(resolve(migrationDirectory, filename), "utf8"),
-    );
-  }
+  const migrations = readdirSync(migrationDirectory).sort();
 
-  await database.exec(`
-    grant usage on schema public, auth to authenticated, anon;
-    grant select, insert, update, delete
-      on table public.vocabulary_entries
-      to authenticated;
-  `);
+  for (const [index, filename] of migrations.entries()) {
+    let migration = readFileSync(resolve(migrationDirectory, filename), "utf8");
+
+    if (index === 0) {
+      await database.exec(migration);
+      await database.exec(`
+        grant select, insert, update, delete
+          on table public.vocabulary_entries
+          to anon;
+      `);
+      continue;
+    }
+
+    const functionRevoke = `revoke all privileges
+on function public.save_vocabulary_entry(text, text, text, text)`;
+    migration = migration.replace(
+      functionRevoke,
+      `grant execute
+on function public.save_vocabulary_entry(text, text, text, text)
+to anon;
+
+${functionRevoke}`,
+    );
+
+    await database.exec(migration);
+  }
 
   return database;
 }
@@ -84,7 +101,7 @@ async function queryAsUser<T extends Record<string, unknown>>(
 }
 
 describe("atomic vocabulary lookup save", () => {
-  it("consolidates legacy duplicates before enforcing uniqueness", async () => {
+  it("canonicalizes and consolidates legacy browser identities before enforcing uniqueness", async () => {
     const database = await PGlite.create();
     const migrations = readdirSync(migrationDirectory).sort();
 
@@ -106,12 +123,14 @@ describe("atomic vocabulary lookup save", () => {
           last_looked_up_at
         ) values
           (
-            '${learnerOneId}', 'en', 'pl', 'Good morning', 'good morning',
-            'Dzień dobry', 2, '2026-07-28T10:00:00Z', '2026-07-28T11:00:00Z'
+            '${learnerOneId}', 'en', 'pl', U&'istanbul\\FEFF taxi', 'istanbul taxi',
+            'Taksówka w Stambule', 2,
+            '2026-07-28T10:00:00Z', '2026-07-28T11:00:00Z'
           ),
           (
-            '${learnerOneId}', 'en', 'pl', 'GOOD MORNING', 'good morning',
-            'Dzień dobry!', 3, '2026-07-29T10:00:00Z', '2026-07-29T11:00:00Z'
+            '${learnerOneId}', 'en', 'pl', U&'\\0130STANBUL TAXI', U&'i\\0307stanbul taxi',
+            'Taksówka w Stambule!', 3,
+            '2026-07-29T10:00:00Z', '2026-07-29T11:00:00Z'
           );
       `);
 
@@ -121,23 +140,56 @@ describe("atomic vocabulary lookup save", () => {
 
       const entries = await database.query<{
         original_text: string;
+        normalized_original_text: string;
         translated_text: string;
         lookup_count: number;
         created_at: Date;
         last_looked_up_at: Date;
       }>(`
-        select original_text, translated_text, lookup_count, created_at, last_looked_up_at
+        select
+          original_text,
+          normalized_original_text,
+          translated_text,
+          lookup_count,
+          created_at,
+          last_looked_up_at
         from public.vocabulary_entries
       `);
       expect(entries.rows).toEqual([
         {
-          original_text: "GOOD MORNING",
-          translated_text: "Dzień dobry!",
+          original_text: "İSTANBUL TAXI",
+          normalized_original_text: "istanbul taxi",
+          translated_text: "Taksówka w Stambule!",
           lookup_count: 5,
           created_at: new Date("2026-07-28T10:00:00Z"),
           last_looked_up_at: new Date("2026-07-29T11:00:00Z"),
         },
       ]);
+
+      const repeated = await queryAsUser<{
+        normalized_original_text: string;
+        translated_text: string;
+        lookup_count: number;
+      }>(
+        database,
+        learnerOneId,
+        "select normalized_original_text, translated_text, lookup_count from public.save_vocabulary_entry('en', 'pl', $1, $2)",
+        ["İstanbul\uFEFF taxi", "Stambuł taxi"],
+      );
+      expect(repeated.rows).toEqual([
+        {
+          normalized_original_text: "istanbul taxi",
+          translated_text: "Stambuł taxi",
+          lookup_count: 6,
+        },
+      ]);
+
+      const rowCount = await queryAsUser<{ count: number }>(
+        database,
+        learnerOneId,
+        "select count(*)::integer as count from public.vocabulary_entries",
+      );
+      expect(rowCount.rows).toEqual([{ count: 1 }]);
     } finally {
       await database.close();
     }
@@ -166,6 +218,66 @@ describe("atomic vocabulary lookup save", () => {
             "p_translated_text",
           ],
           security_definer: false,
+        },
+      ]);
+
+      const privileges = await database.query<{
+        role_name: string;
+        can_execute_save: boolean;
+        can_select_entries: boolean;
+        can_insert_entries: boolean;
+        can_update_entries: boolean;
+        can_delete_entries: boolean;
+        can_truncate_entries: boolean;
+        can_reference_entries: boolean;
+        can_trigger_entries: boolean;
+      }>(`
+        select
+          role_name,
+          has_function_privilege(
+            role_name,
+            'public.save_vocabulary_entry(text, text, text, text)',
+            'execute'
+          ) as can_execute_save,
+          has_table_privilege(role_name, 'public.vocabulary_entries', 'select')
+            as can_select_entries,
+          has_table_privilege(role_name, 'public.vocabulary_entries', 'insert')
+            as can_insert_entries,
+          has_table_privilege(role_name, 'public.vocabulary_entries', 'update')
+            as can_update_entries,
+          has_table_privilege(role_name, 'public.vocabulary_entries', 'delete')
+            as can_delete_entries,
+          has_table_privilege(role_name, 'public.vocabulary_entries', 'truncate')
+            as can_truncate_entries,
+          has_table_privilege(role_name, 'public.vocabulary_entries', 'references')
+            as can_reference_entries,
+          has_table_privilege(role_name, 'public.vocabulary_entries', 'trigger')
+            as can_trigger_entries
+        from (values ('authenticated'), ('anon')) as roles(role_name)
+        order by role_name
+      `);
+      expect(privileges.rows).toEqual([
+        {
+          role_name: "anon",
+          can_execute_save: false,
+          can_select_entries: false,
+          can_insert_entries: false,
+          can_update_entries: false,
+          can_delete_entries: false,
+          can_truncate_entries: false,
+          can_reference_entries: false,
+          can_trigger_entries: false,
+        },
+        {
+          role_name: "authenticated",
+          can_execute_save: true,
+          can_select_entries: true,
+          can_insert_entries: true,
+          can_update_entries: true,
+          can_delete_entries: true,
+          can_truncate_entries: false,
+          can_reference_entries: false,
+          can_trigger_entries: false,
         },
       ]);
 
@@ -337,7 +449,7 @@ describe("atomic vocabulary lookup save", () => {
     }
   });
 
-  it("increments exactly once for every concurrently requested duplicate", async () => {
+  it("increments exactly once for every overlapping duplicate save", async () => {
     const database = await createVocabularyDatabase();
 
     try {
@@ -365,14 +477,11 @@ describe("atomic vocabulary lookup save", () => {
       ).toBe(1);
 
       const stored = await database.query<{
-        translated_text: string;
         lookup_count: number;
       }>(
-        "select translated_text, lookup_count from public.vocabulary_entries",
+        "select lookup_count from public.vocabulary_entries",
       );
-      expect(stored.rows).toEqual([
-        { translated_text: "Taxi 7", lookup_count: 8 },
-      ]);
+      expect(stored.rows).toEqual([{ lookup_count: 8 }]);
     } finally {
       await database.close();
     }

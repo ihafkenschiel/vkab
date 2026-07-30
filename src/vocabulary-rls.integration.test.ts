@@ -13,6 +13,7 @@ async function createVocabularyDatabase() {
   await database.exec(`
     create schema auth;
     create role authenticated nologin;
+    create role anon nologin;
     create table auth.users (id uuid primary key);
     create function auth.uid()
     returns uuid
@@ -24,19 +25,13 @@ async function createVocabularyDatabase() {
     insert into auth.users (id) values
       ('${learnerOneId}'),
       ('${learnerTwoId}');
+    grant usage on schema auth to authenticated;
   `);
   for (const filename of readdirSync(migrationDirectory).sort()) {
     await database.exec(
       readFileSync(resolve(migrationDirectory, filename), "utf8"),
     );
   }
-  await database.exec(`
-    grant usage on schema public, auth to authenticated;
-    grant select, insert, update, delete
-      on table public.vocabulary_entries
-      to authenticated;
-  `);
-
   return database;
 }
 

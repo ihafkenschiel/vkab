@@ -1,3 +1,38 @@
+create function public.clean_vocabulary_original(p_original_text text)
+returns text
+language sql
+immutable
+strict
+set search_path = ''
+as $$
+  select normalize(
+    btrim(
+      regexp_replace(
+        p_original_text,
+        U&'[[:space:]\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000\FEFF]+',
+        ' ',
+        'g'
+      )
+    ),
+    NFC
+  )
+$$;
+
+create function public.normalize_vocabulary_lookup(p_original_text text)
+returns text
+language sql
+immutable
+strict
+set search_path = ''
+as $$
+  select lower(public.clean_vocabulary_original(p_original_text))
+$$;
+
+update public.vocabulary_entries
+set
+  original_text = public.clean_vocabulary_original(original_text),
+  normalized_original_text = public.normalize_vocabulary_lookup(original_text);
+
 with ranked_entries as (
   select
     id,
@@ -69,18 +104,12 @@ set search_path = ''
 as $$
 declare
   current_owner_id uuid := auth.uid();
-  display_original_text text := normalize(
-    btrim(
-      regexp_replace(
-        p_original_text,
-        U&'[[:space:]\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000]+',
-        ' ',
-        'g'
-      )
-    ),
-    NFC
+  display_original_text text := public.clean_vocabulary_original(
+    p_original_text
   );
-  lookup_identity text := lower(display_original_text);
+  lookup_identity text := public.normalize_vocabulary_lookup(
+    p_original_text
+  );
   saved_entry public.vocabulary_entries;
 begin
   if current_owner_id is null then
@@ -124,9 +153,34 @@ begin
 end;
 $$;
 
-revoke all on function public.save_vocabulary_entry(text, text, text, text)
-from public;
+revoke all privileges
+on function public.save_vocabulary_entry(text, text, text, text)
+from public, anon, authenticated;
 
 grant execute
 on function public.save_vocabulary_entry(text, text, text, text)
+to authenticated;
+
+revoke all privileges
+on function public.clean_vocabulary_original(text)
+from public, anon, authenticated;
+
+revoke all privileges
+on function public.normalize_vocabulary_lookup(text)
+from public, anon, authenticated;
+
+grant execute
+on function public.clean_vocabulary_original(text)
+to authenticated;
+
+grant execute
+on function public.normalize_vocabulary_lookup(text)
+to authenticated;
+
+revoke all privileges
+on table public.vocabulary_entries
+from public, anon, authenticated;
+
+grant select, insert, update, delete
+on table public.vocabulary_entries
 to authenticated;
